@@ -310,7 +310,7 @@ public class Program
                         LibName = package.Id,
                         Version = package.Version,
                         IsTransitive = package.IsTransitive,
-                        CopyrightOwner = ExtractCopyrightOwner(packageMetadata.Owners),
+                        SpdxIdentifier = ExtractSpdxIdentifier(packageMetadata),
                         CopyrightYear = ExtractCopyrightYear(packageMetadata.Published?.Year.ToString()),
                         LicenseUrl = packageMetadata.LicenseUrl?.ToString(),
                         ProjectUrl = packageMetadata.ProjectUrl?.ToString(),
@@ -329,19 +329,30 @@ public class Program
         return packageDetails;
     }
 
-    private static string? ExtractCopyrightOwner(string? owners)
-    {
-        if (string.IsNullOrEmpty(owners))
-            return null;
-
-        // For owners, just return the first owner or the whole string if short
-        var ownerList = owners.Split(',').Select(o => o.Trim()).Where(o => !string.IsNullOrEmpty(o));
-        return ownerList.FirstOrDefault();
-    }
-
     private static string? ExtractCopyrightYear(string? year)
     {
         return year; // Return the year as-is if provided
+    }
+
+    private static string? ExtractSpdxIdentifier(IPackageSearchMetadata packageMetadata)
+    {
+        try
+        {
+            // Use reflection to access LicenseExpression property since it's not on the interface
+            var type = packageMetadata.GetType();
+            var licenseExpressionProp = type.GetProperty("LicenseExpression");
+            if (licenseExpressionProp != null)
+            {
+                var licenseExpression = licenseExpressionProp.GetValue(packageMetadata) as string;
+                return string.IsNullOrWhiteSpace(licenseExpression) ? null : licenseExpression;
+            }
+        }
+        catch (Exception)
+        {
+            // If we can't access LicenseExpression, return null
+        }
+        
+        return null;
     }
 
     private static async Task WriteJsonOutput(List<PackageDetails> packageDetails)
@@ -378,7 +389,7 @@ public class PackageDetails
     public string LibName { get; set; } = string.Empty;
     public string Version { get; set; } = string.Empty;
     public bool IsTransitive { get; set; }
-    public string? CopyrightOwner { get; set; }
+    public string? SpdxIdentifier { get; set; }
     public string? CopyrightYear { get; set; }
     public string? LicenseUrl { get; set; }
     public string? ProjectUrl { get; set; }

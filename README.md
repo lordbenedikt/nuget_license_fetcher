@@ -46,7 +46,7 @@ The application generates a `package-licenses.json` file containing detailed inf
     "libName": "Newtonsoft.Json",
     "version": "13.0.3",
     "isTransitive": false,
-    "copyrightOwner": null,
+    "spdxIdentifier": "MIT",
     "copyrightYear": "2023",
     "licenseUrl": "https://www.nuget.org/packages/Newtonsoft.Json/13.0.3/license",
     "projectUrl": "https://www.newtonsoft.com/json",
@@ -62,7 +62,7 @@ The application generates a `package-licenses.json` file containing detailed inf
 - `libName` - The NuGet package ID
 - `version` - The package version used in the project
 - `isTransitive` - Boolean indicating if this is a transitive dependency
-- `copyrightOwner` - The package owner (currently extracted from package metadata)
+- `spdxIdentifier` - The SPDX license identifier (e.g., "MIT", "Apache-2.0")
 - `copyrightYear` - The copyright year (extracted from package publication date)
 - `licenseUrl` - URL to the package license
 - `projectUrl` - URL to the package's project homepage
