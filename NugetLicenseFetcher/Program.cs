@@ -75,25 +75,19 @@ public class Program
                 
                 foreach (var projectFile in projectFiles)
                 {
-                    var projectPackages = await ExtractFromCsproj(projectFile);
+                    var projectPackages = await ExtractFromProject(projectFile, includeTransitive);
                     packages.AddRange(projectPackages);
                 }
             }
             else if (projectPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
             {
                 // Handle single project file
-                packages = await ExtractFromCsproj(projectPath);
+                packages = await ExtractFromProject(projectPath, includeTransitive);
             }
             else
             {
                 Console.WriteLine("Error: Only .csproj and .sln files are supported.");
                 return packages;
-            }
-
-            // TODO: Add transitive dependency extraction if includeTransitive is true
-            if (includeTransitive)
-            {
-                Console.WriteLine("Note: Transitive dependency extraction not yet implemented.");
             }
         }
         catch (Exception ex)
@@ -102,6 +96,126 @@ public class Program
         }
 
         return packages.Distinct().ToList();
+    }
+
+    private static async Task<List<PackageReference>> ExtractFromProject(string projectPath, bool includeTransitive)
+    {
+        var packages = new List<PackageReference>();
+        
+        // First, get direct package references from the csproj file
+        var directPackages = await ExtractFromCsproj(projectPath);
+        packages.AddRange(directPackages);
+        
+        if (includeTransitive)
+        {
+            try
+            {
+                // Use dotnet list package command to get transitive dependencies
+                var transitivePackages = await ExtractTransitiveDependencies(projectPath);
+                packages.AddRange(transitivePackages);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Could not extract transitive dependencies: {ex.Message}");
+            }
+        }
+        
+        return packages;
+    }
+    
+    private static async Task<List<PackageReference>> ExtractTransitiveDependencies(string projectPath)
+    {
+        var packages = new List<PackageReference>();
+        
+        try
+        {
+            var processInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "dotnet",
+                Arguments = $"list \"{projectPath}\" package --include-transitive",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WorkingDirectory = Path.GetDirectoryName(projectPath)
+            };
+
+            using var process = System.Diagnostics.Process.Start(processInfo);
+            if (process != null)
+            {
+                var output = await process.StandardOutput.ReadToEndAsync();
+                var error = await process.StandardError.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode == 0)
+                {
+                    packages = ParseDotnetListPackageOutput(output);
+                }
+                else
+                {
+                    Console.WriteLine($"Error running dotnet list package: {error}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error extracting transitive dependencies: {ex.Message}");
+        }
+        
+        return packages;
+    }
+    
+    private static List<PackageReference> ParseDotnetListPackageOutput(string output)
+    {
+        var packages = new List<PackageReference>();
+        var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        
+        bool inTransitiveSection = false;
+        bool inTopLevelSection = false;
+        
+        foreach (var line in lines)
+        {
+            var trimmedLine = line.Trim();
+            
+            if (trimmedLine.Contains("Top-level Package"))
+            {
+                inTopLevelSection = true;
+                inTransitiveSection = false;
+                continue;
+            }
+            
+            if (trimmedLine.Contains("Transitive Package"))
+            {
+                inTransitiveSection = true;
+                inTopLevelSection = false;
+                continue;
+            }
+            
+            // Parse package lines that start with ">"
+            if (trimmedLine.StartsWith(">") && (inTransitiveSection || inTopLevelSection))
+            {
+                var parts = trimmedLine.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 3)
+                {
+                    var packageId = parts[1];
+                    var version = parts[2];
+                    
+                    // Only add transitive packages if we're in the transitive section
+                    // or direct packages if we're in the top-level section
+                    if (inTransitiveSection)
+                    {
+                        packages.Add(new PackageReference(packageId, version, true));
+                    }
+                    else if (inTopLevelSection)
+                    {
+                        // We already have direct packages from XML parsing, so skip these
+                        continue;
+                    }
+                }
+            }
+        }
+        
+        return packages;
     }
 
     private static List<string> ExtractProjectFilesFromSolution(string solutionContent, string solutionDir)
