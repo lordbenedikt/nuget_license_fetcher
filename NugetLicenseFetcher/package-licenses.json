@@ -1,1 +1,38 @@
-[]
+[
+  {
+    "libName": "Microsoft.EntityFrameworkCore.SqlServer",
+    "version": "9.0.8",
+    "isTransitive": false,
+    "copyrightOwner": null,
+    "copyrightYear": "2025",
+    "licenseUrl": "https://www.nuget.org/packages/Microsoft.EntityFrameworkCore.SqlServer/9.0.8/license",
+    "projectUrl": "https://docs.microsoft.com/ef/core/",
+    "authors": [
+      "Microsoft"
+    ]
+  },
+  {
+    "libName": "Newtonsoft.Json",
+    "version": "13.0.3",
+    "isTransitive": false,
+    "copyrightOwner": null,
+    "copyrightYear": "2023",
+    "licenseUrl": "https://www.nuget.org/packages/Newtonsoft.Json/13.0.3/license",
+    "projectUrl": "https://www.newtonsoft.com/json",
+    "authors": [
+      "James Newton-King"
+    ]
+  },
+  {
+    "libName": "Serilog",
+    "version": "4.3.0",
+    "isTransitive": false,
+    "copyrightOwner": null,
+    "copyrightYear": "2025",
+    "licenseUrl": "https://www.nuget.org/packages/Serilog/4.3.0/license",
+    "projectUrl": "https://serilog.net/",
+    "authors": [
+      "Serilog Contributors"
+    ]
+  }
+]
