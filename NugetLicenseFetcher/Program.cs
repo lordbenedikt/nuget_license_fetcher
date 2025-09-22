@@ -1,5 +1,6 @@
 ﻿using System.CommandLine;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using NuGet.Common;
 using NuGet.Protocol;
@@ -48,8 +49,10 @@ public class Program
             Console.WriteLine($"Include transitive dependencies: {includeTransitive}");
 
             var packages = await ExtractPackageReferences(path, includeTransitive);
-            var packageDetails = await FetchPackageDetails(packages);
-            await WriteJsonOutput(packageDetails);
+            List<PackageDetails> notFoundPkgs = [];
+            var packageDetails = await FetchPackageDetails(packages, notFoundPkgs);
+            await WriteJsonOutput(packageDetails, "package-licenses.json");
+            await WriteJsonOutput(notFoundPkgs, "not-found-licenses.json");
 
             Console.WriteLine($"Successfully processed {packageDetails.Count} packages.");
         }
@@ -276,7 +279,9 @@ public class Program
         return packages;
     }
 
-    private static async Task<List<PackageDetails>> FetchPackageDetails(List<PackageReference> packages)
+    private static async Task<List<PackageDetails>> FetchPackageDetails(
+        List<PackageReference> packages, 
+        List<PackageDetails>? notFoundPkgs = null)
     {
         var packageDetails = new List<PackageDetails>();
         var logger = NullLogger.Instance;
@@ -286,8 +291,13 @@ public class Program
         var repository = Repository.Factory.GetCoreV3("https://api.nuget.org/v3/index.json");
         var metadataResource = await repository.GetResourceAsync<PackageMetadataResource>();
 
+        var peergroupRegex = new Regex(@"(PSI.|EIB.|PSIS.|PTO.|PTOS.|PEERGroup.).*");
+
         foreach (var package in packages)
         {
+            if (peergroupRegex.IsMatch(package.Id))
+                continue;
+            
             try
             {
                 Console.WriteLine($"Fetching details for {package.Id} {package.Version}...");
@@ -319,6 +329,24 @@ public class Program
 
                     packageDetails.Add(details);
                 }
+                else
+                {
+                    var details = new PackageDetails
+                    {
+                        LibName = package.Id,
+                        Version = package.Version,
+                        IsTransitive = package.IsTransitive,
+                        SpdxIdentifier = "metadata not found",
+                        CopyrightYear = "metadata not found",
+                        LicenseUrl = "metadata not found",
+                        ProjectUrl = "metadata not found",
+                        Authors = ["metadata not found", ],
+                    };
+                    notFoundPkgs?.Add(details);
+                    throw new MetadataNotFoundException($"metadata not found.");
+                }
+                
+                Console.WriteLine($"Successfully fetched details for {package.Id} {package.Version}.");
             }
             catch (Exception ex)
             {
@@ -355,9 +383,8 @@ public class Program
         return null;
     }
 
-    private static async Task WriteJsonOutput(List<PackageDetails> packageDetails)
+    private static async Task WriteJsonOutput(List<PackageDetails> packageDetails, string outputPath)
     {
-        var outputPath = "package-licenses.json";
         var options = new JsonSerializerOptions
         {
             WriteIndented = true,
